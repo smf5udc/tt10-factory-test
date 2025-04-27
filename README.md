@@ -1,30 +1,49 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Tiny Tapeout Factory Test
+# Tiny Tapeout Medi-Minder
 
 - [Read the documentation for project](docs/info.md)
 
-## What is Tiny Tapeout?
+## Objective and Motivation:
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+The medi-minder is a ASIC design for TinyTapeOut10 that tracks when medication is supposed to be taken and logs if that medication was taken. This project came to mind because of some struggles that I am currently facing. As a chronically ill person, I have to take multiple medications throughout the day. I find it hard to keep track of when to take my medications because they're constantly changing. I believe that integrating a chip of this design into a pill organizer/bottle could be successful and very useful for many.
 
-To learn more and get started, visit https://tinytapeout.com.
+## Introduction/Context:
+optional section
 
-## Set up your Verilog project
+## Implementation Details:
+• Top Module Medication Reminder
+  – Medication Database Logic - Stores a list of medications and their scheduled times
+    * medications[0:15]: holds the scheduled "times" for each medication.
+    * med_pointer: keeps track of how many medications the user has added
+  – Scheduler Logic - Keeps an internal clock, and constantly checks if it’s time to take a medica-
+tion.
+    * internal_clock increments on every clock cycle
+    * Loops through all medications (medications[0..med_pointer-1]).
+    * If internal_clock == medication[i], it raises a flag medication_due and remembers which
+one (due_med_idx)
+    * internal_clock: software clock counting up.
+    * medication_due: 1 if a medication is due right now.
+    * due_med_idx: which medication (index) is currently due
+  – Logger Logic - Every time a medication is due, save the event (time and which medication)
+    * If medication_due == 1, it saves time, med_idx into log_memory.
+    * log_pointer points to the next free log spot.
+    * log_memory[0:15]: stores each event that happened, Upper 8 bits: time medication was
+due and lower 8 bits stores which medication it was
+    * log_pointer: points to next empty log slot.
+  – LCD Controller Logic - Shows log information on the output
+    * It looks at log_memory[lcd_pointer] and sends part of it to the output.
+    * toggle_view selects which part: Time of event or Medication ID
+    * uio_in[0] (button) toggles the view, and after two toggles moves to the next log.
+    * lcd_reg: holds the data to be sent to uo_out.
+    * lcd_pointer: selects which log entry to display
+    * toggle_view: switches between time view and medication ID view
+    * ack_prev: remembers previous button state (for clean button press detection).
+![alt text](https://github.com/smf5udc/tt10-med_test/blob/main/asic_project.png)
+## Actions that need to be completed:
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
 
-The GitHub action will automatically build the ASIC files using [OpenLane](https://www.zerotoasiccourse.com/terminology/openlane/).
-
-## Enable GitHub actions to build the results page
-
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
-
-## Resources
-
+## References/Source files:
 - [FAQ](https://tinytapeout.com/faq/)
 - [Digital design lessons](https://tinytapeout.com/digital_design/)
 - [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
