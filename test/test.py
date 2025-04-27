@@ -4,14 +4,14 @@ from cocotb.result import TestFailure
 import random
 
 async def reset_dut(dut):
-    dut.rst.value = 1
+    dut.rst_n.value = 1
     dut.key_in.value = 0
     dut.key_valid.value = 0
     dut.time_in.value = 0
     dut.time_tick.value = 0
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-    dut.rst.value = 0
+    dut.rst_n.value = 0
     await RisingEdge(dut.clk)
 
 @cocotb.test()
