@@ -1,72 +1,73 @@
-# SPDX-FileCopyrightText: © 2024 Tiny Tapeout
-# SPDX-License-Identifier: Apache-2.0
-
 import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles
+from cocotb.triggers import RisingEdge, Timer
+from cocotb.result import TestFailure
+import random
 
+async def reset_dut(dut):
+    dut.rst.value = 1
+    dut.key_in.value = 0
+    dut.key_valid.value = 0
+    dut.time_in.value = 0
+    dut.time_tick.value = 0
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    dut.rst.value = 0
+    await RisingEdge(dut.clk)
 
 @cocotb.test()
-async def test_loopback(dut):
-    dut._log.info("Start")
-
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, units="us")
-    cocotb.start_soon(clock.start())
-
+async def test_med_reminder_basic(dut):
+    """Basic test of adding a medication and acknowledging it."""
     # Reset
-    dut._log.info("Reset")
-    dut.ena.value = 1
+    await reset_dut(dut)
 
-    # ui_in[0] == 0: Output is uio_in
-    dut.ui_in.value = 0
-    dut.uio_in.value = 0
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
-    dut.rst_n.value = 1
+    # Helper: Send a key press
+    async def send_key(key_ascii):
+        dut.key_in.value = key_ascii
+        dut.key_valid.value = 1
+        await RisingEdge(dut.clk)
+        dut.key_valid.value = 0
+        await RisingEdge(dut.clk)
 
-    for i in range(256):
-        dut.uio_in.value = i
-        await ClockCycles(dut.clk, 1)
-        assert dut.uo_out.value == i
+    # Add a medication by pressing 'A'
+    dut.time_in.value = 0x1200  # Suppose current time is 12:00 in BCD
+    await send_key(ord('A'))
 
-    # When under reset: Output is uio_in, uio is in input mode
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 1)
-    assert dut.uio_oe.value == 0
-    for i in range(256):
-        dut.ui_in.value = i
-        await ClockCycles(dut.clk, 1)
-        assert dut.uo_out.value == i
+    # Check if LCD output valid with 'M' for med
+    await RisingEdge(dut.clk)
+    if not dut.lcd_valid.value:
+        raise TestFailure("LCD should be valid after adding medication")
+    if dut.lcd_out.value != ord('M'):
+        raise TestFailure(f"Expected LCD output 'M', got {chr(dut.lcd_out.value)}")
 
-@cocotb.test()
-async def test_counter(dut):
-    dut._log.info("Start")
+    # Simulate time tick at medication time
+    await Timer(1, units="us")
+    dut.time_in.value = 0x1200  # Match scheduled time
+    dut.time_tick.value = 1
+    await RisingEdge(dut.clk)
+    dut.time_tick.value = 0
 
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, units="us")
-    cocotb.start_soon(clock.start())
+    # Check if LCD output shows the medication
+    await RisingEdge(dut.clk)
+    if not dut.lcd_valid.value:
+        raise TestFailure("LCD should be valid on medication alert")
+    if dut.lcd_out.value != ord('M'):
+        raise TestFailure(f"Expected LCD output 'M' during alert, got {chr(dut.lcd_out.value)}")
 
-    # ui_in[0] == 1: bidirectional outputs enabled, put a counter on both output and bidirectional pins
-    dut.ui_in.value = 1
-    dut.uio_in.value = 0
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
-    dut.rst_n.value = 1
-    await ClockCycles(dut.clk, 2)
+    # Acknowledge by pressing 'Y'
+    await send_key(ord('Y'))
+    await RisingEdge(dut.clk)
 
-    dut._log.info("Testing counter")
-    for i in range(256):
-        assert dut.uo_out.value == dut.uio_out.value
-        assert dut.uo_out.value == i
-        await ClockCycles(dut.clk, 1)
+    # Dump the log by pressing 'D'
+    await send_key(ord('D'))
 
-    dut._log.info("Testing reset")
-    for i in range(5):
-        assert dut.uo_out.value == i
-        await ClockCycles(dut.clk, 1)
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 2)
-    dut.rst_n.value = 1
-    await ClockCycles(dut.clk, 1)
-    assert dut.uo_out.value == 0
+    # Check if log output is valid
+    for _ in range(3):
+        await RisingEdge(dut.clk)
+        if dut.log_valid.value:
+            if dut.log_out.value != ord('M'):
+                raise TestFailure(f"Expected log out 'M', got {chr(dut.log_out.value)}")
+            break
+    else:
+        raise TestFailure("No valid log output found after dumping")
+
+    cocotb.log.info("Basic medication reminder test passed!")
