@@ -26,6 +26,7 @@ module tt_um_medication_reminder (
     reg [7:0] lcd_reg;              // LCD output register
 
     reg ack_prev;                   // Previous ack button state (for edge detection)
+    reg toggle_view;                // Toggle between showing time and medication id
 
     // Add new medication logic
     always @(posedge clk or negedge rst_n) begin
@@ -67,26 +68,35 @@ module tt_um_medication_reminder (
         end
     end
 
-    // LCD Controller Logic
+    // LCD Controller and Button Logic
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             lcd_pointer <= 0;
             lcd_reg <= 8'h00;
             ack_prev <= 0;
+            toggle_view <= 0;
         end else begin
             ack_prev <= uio_in[0]; // Capture previous state for edge detection
 
             if (uio_in[0] && !ack_prev) begin
                 // Rising edge detected: user pressed ACK button
-                lcd_pointer <= lcd_pointer + 1; // Cycle to next log entry
+                toggle_view <= ~toggle_view;
+                if (toggle_view == 0) begin
+                    lcd_pointer <= lcd_pointer + 1; // Advance to next log after med ID displayed
+                end
             end
 
-            lcd_reg <= log_memory[lcd_pointer][15:8]; // Display time part of the log
+            // Update LCD output based on toggle_view
+            if (toggle_view == 0) begin
+                lcd_reg <= log_memory[lcd_pointer][15:8]; // Show time part
+            end else begin
+                lcd_reg <= {4'b0000, log_memory[lcd_pointer][3:0]}; // Show medication ID (4 bits)
+            end
         end
     end
 
     // Assign outputs
-    assign uo_out  = lcd_reg;    // LCD shows the time when medication was due
+    assign uo_out  = lcd_reg;    // LCD shows the value
     assign uio_out = 8'h00;      // Not driving any special signals
     assign uio_oe  = 8'h00;      // All UIO pins set to input mode except uio_in[0]
 
