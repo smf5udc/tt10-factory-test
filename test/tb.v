@@ -26,7 +26,7 @@ module tb ();
 `endif
 
     // Instantiate the device under test (DUT)
-    tt_um_medication_reminder #(
+    tt_um_factory_test #(
         .MEM_DEPTH(16),
         .MEM_ADDR_WIDTH(4)
     ) dut (
