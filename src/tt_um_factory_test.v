@@ -1,10 +1,10 @@
 default_nettype none
 
-module tt_um_medication_reminder #(
+module tt_um_factory_test #(
     parameter MEM_DEPTH = 16,
     parameter MEM_ADDR_WIDTH = 4 // log2(MEM_DEPTH)
 )(
-    input  wire        clk,	
+    input  wire        clk,    
     input  wire        rst_n,
     input  wire        ena,
     input  wire [7:0]  ui_in,
@@ -15,13 +15,13 @@ module tt_um_medication_reminder #(
 );
 
     // Internal signals
-    reg [7:0] medications [0:MEM_DEPTH-1];
+    reg [7:0] medications [0:15];  // Fixed size array
     reg [MEM_ADDR_WIDTH-1:0] med_pointer;
 
     reg [7:0] internal_clock;
     reg medication_due;
 
-    reg [7:0] log_memory [0:MEM_DEPTH-1];
+    reg [7:0] log_memory [0:15];  // Fixed size array
     reg [MEM_ADDR_WIDTH-1:0] log_pointer;
     reg log_ready;
 
@@ -40,13 +40,13 @@ module tt_um_medication_reminder #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             med_pointer <= 0;
-            for (i = 0; i < MEM_DEPTH; i = i + 1)
+            for (i = 0; i < 16; i = i + 1)  // Use fixed size (16)
                 medications[i] <= 8'h00;
             medication_due <= 0;
             internal_clock <= 0;
             log_pointer <= 0;
             log_ready <= 0;
-            for (i = 0; i < MEM_DEPTH; i = i + 1)
+            for (i = 0; i < 16; i = i + 1)  // Use fixed size (16)
                 log_memory[i] <= 8'h00;
             lcd_reg <= 8'h00;
             last_ui_in <= 8'h00;
@@ -70,7 +70,7 @@ module tt_um_medication_reminder #(
                     4'b0001: begin
                         // Add medication
                         medications[med_pointer] <= {4'b0000, data}; // Extend 4 bits to 8 bits
-                        med_pointer <= (med_pointer == MEM_DEPTH-1) ? 0 : med_pointer + 1;
+                        med_pointer <= (med_pointer == 15) ? 0 : med_pointer + 1;  // Use 15 instead of MEM_DEPTH-1
                     end
                     4'b0010: begin
                         // Acknowledge medication taken
@@ -78,13 +78,13 @@ module tt_um_medication_reminder #(
                     end
                     4'b0011: begin
                         // Clear log memory
-                        for (i = 0; i < MEM_DEPTH; i = i + 1)
+                        for (i = 0; i < 16; i = i + 1)  // Use fixed size (16)
                             log_memory[i] <= 8'h00;
                         log_pointer <= 0;
                     end
                     4'b0100: begin
                         // Select which log entry to view
-                        if (data < MEM_DEPTH)
+                        if (data < 16)  // Use fixed size (16)
                             lcd_reg <= log_memory[data];
                         else
                             lcd_reg <= 8'hFF; // Error display
@@ -98,7 +98,7 @@ module tt_um_medication_reminder #(
             // Logger: record medication due event
             if (medication_due && !log_ready) begin
                 log_memory[log_pointer] <= internal_clock;
-                log_pointer <= (log_pointer == MEM_DEPTH-1) ? 0 : log_pointer + 1;
+                log_pointer <= (log_pointer == 15) ? 0 : log_pointer + 1;  // Use 15 instead of MEM_DEPTH-1
                 log_ready <= 1'b1;
             end else if (!medication_due) begin
                 log_ready <= 1'b0;
